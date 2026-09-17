@@ -1,0 +1,35 @@
+{
+  "name": "firebird",
+  "version": "1.0.0",
+  "description": "API usando node-firebird",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "release": "pkg index.js --targets node18-win-x64,node18-linux-x64 --output firebird-api"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cli-table3": "^0.6.5",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "ini": "^7.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "node-firebird": "^1.1.8",
+    "pkg": "^5.8.1"
+  },
+  "bin": "index.js",
+  "pkg": {
+    "assets": [
+      "fbclient.dll",
+      "libfbclient.so",
+      "config/*.json",
+      "views/**/*",
+      ".env"
+    ],
+    "targets": [
+      "node18-win-x64",
+      "node18-linux-x64"
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+data/
+fbclient.dll
+ini.ini
+libfbclient.so
+
