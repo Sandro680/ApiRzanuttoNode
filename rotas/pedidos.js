@@ -471,28 +471,97 @@ rotaPedidos.put('/pedido/:filial/:pedido', asyncHandler(async (req, res) => {
     });
 }));
 
+// FATURA COM NOTA E SEM NOTA
 rotaPedidos.post('/pedido/faturar', asyncHandler(async (req, res) => {
-    const { pv_filial, pv_codigo, tipo } = req.body;
+    const { pv_filial, pv_codigo, tipo, pv_cfop, pv_transportador, pv_user } = req.body;
 
     if (tipo === 'SEM_NOTA') {
         const sql = `EXECUTE PROCEDURE SPGERAFATURAMENTOF01(?, ?)`;
-        
         try {
             await ExecQueryAsync(req.dbOptions, sql, [pv_filial, pv_codigo], "T");
-            
-            res.json({ 
+            return res.json({ 
                 sucesso: true, 
-                mensagem: "Pedido faturado com sucesso!" 
+                mensagem: "Pedido faturado sem nota com sucesso!" 
             });
         } catch (err) {
-            console.error("Erro no faturamento:", err.message);
-            res.status(400).json({ 
+            console.error("Erro no faturamento sem nota:", err.message);
+            return res.status(400).json({ 
                 sucesso: false, 
                 mensagem: "Erro ao faturar: " + err.message 
             });
         }
+    } else if (tipo === 'NFE') {
+        if (!pv_cfop) {
+            return res.status(400).json({ 
+                sucesso: false, 
+                mensagem: "Selecione um CFOP / Tipo de Nota para faturar com NFe" 
+            });
+        }
+
+        const iTipo = 1; // Tipo de faturamento para NFe
+        const iTransp = pv_transportador || 0;
+        const nIdUsuario = pv_user || 1;
+
+        try {
+            // 1. SP_GERAR_FATURAMENTO - Gera e retorna o ID do Faturamento
+            const sqlFaturamento = `SELECT CODIGO FROM SP_GERAR_FATURAMENTO(?, ?)`;
+            const resFat = await ExecQueryAsync(req.dbOptions, sqlFaturamento, [pv_filial, iTipo], "T");
+            
+            const iFaturamento = resFat && resFat[0] ? (resFat[0].CODIGO || resFat[0].codigo) : null;
+            if (!iFaturamento) {
+                throw new Error("Não foi possível obter o código de faturamento.");
+            }
+
+            // 2. Vincular Pedido ao Faturamento (FAT_PEDIDOS)
+            const sqlFatPedidos = `
+                UPDATE OR INSERT INTO FAT_PEDIDOS (FP_FILIAL, FP_FATURAMENTO, FP_FLAG, FP_PEDIDO)
+                VALUES (?, ?, ?, ?)
+                MATCHING (FP_FILIAL, FP_FATURAMENTO, FP_FLAG, FP_PEDIDO)
+            `;
+            await ExecQueryAsync(req.dbOptions, sqlFatPedidos, [pv_filial, iFaturamento, iTipo, pv_codigo], "T");
+
+            // 3. SP_GERAR_ITENS_FATURAMENTO (1º FATURAMENTO, 2º FILIAL)
+            const sqlItens = `EXECUTE PROCEDURE SP_GERAR_ITENS_FATURAMENTO(?, ?)`;
+            await ExecQueryAsync(req.dbOptions, sqlItens, [iFaturamento, pv_filial], "T");
+
+            // 4. SP_GERAR_VENCTOS_FATURAMENTO
+            const sqlVenctos = `EXECUTE PROCEDURE SP_GERAR_VENCTOS_FATURAMENTO(?, ?)`;
+            await ExecQueryAsync(req.dbOptions, sqlVenctos, [iFaturamento, pv_filial], "T");
+
+            // 5. SP_NF_GERAR
+            const sqlNfGerar = `EXECUTE PROCEDURE SP_NF_GERAR(?, ?, ?, ?, ?)`;
+            await ExecQueryAsync(req.dbOptions, sqlNfGerar, [iFaturamento, pv_cfop, iTransp, pv_filial, nIdUsuario], "T");
+
+            // 6. SP_FINALIZAR_FATURAMENTO
+            const sqlFinalizar = `EXECUTE PROCEDURE SP_FINALIZAR_FATURAMENTO(?, ?)`;
+            await ExecQueryAsync(req.dbOptions, sqlFinalizar, [iFaturamento, pv_filial], "T");
+
+            return res.json({ 
+                sucesso: true, 
+                mensagem: "NFe gerada com sucesso!",
+                faturamento: iFaturamento 
+            });
+        } catch (err) {
+            console.error("Erro no faturamento NFe:", err.message);
+            return res.status(400).json({ 
+                sucesso: false, 
+                mensagem: "Erro ao gerar NFe: " + err.message 
+            });
+        }
     } else {
-        res.status(400).json({ mensagem: "Tipo de faturamento não implementado" });
+        return res.status(400).json({ mensagem: "Tipo de faturamento não implementado" });
+    }
+}));
+
+// Rota para buscar os CFOPs / Tipos de Nota Fiscal
+rotaPedidos.get('/pesqcfop', asyncHandler(async (req, res) => {
+    const sql = `SELECT TN_CODIGO, TN_DESCRICAO, TN_CFOP FROM TIPO_NOTA_FISCAL ORDER BY TN_DESCRICAO`;
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, []);
+        res.json(result);
+    } catch (err) {
+        console.error("Erro ao buscar CFOPs:", err.message);
+        res.status(500).json({ mensagem: "Erro ao buscar CFOPs: " + err.message });
     }
 }));
 
