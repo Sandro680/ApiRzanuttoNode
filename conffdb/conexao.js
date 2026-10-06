@@ -23,9 +23,10 @@ async function ExecQueryAsync(dbOptions, sql, params = [], commit = "T") {
     const nomeBanco = dbOptions.database.toUpperCase();
 
     const getAsync = promisify(pool.get).bind(pool);
+    let db; // declara aqui pra usar no finally
 
     try {
-        const db = await getAsync();
+        db = await getAsync();
         poolStats[nomeBanco].active++;
         poolStats[nomeBanco].total++;
 
@@ -42,14 +43,15 @@ async function ExecQueryAsync(dbOptions, sql, params = [], commit = "T") {
         }
 
         poolStats[nomeBanco].active--;
-        db.detach();
+        db.detach(); // fecha a conexão aqui
 
+        //console.log("Resultado da query:", result); // log pra depuração
         return result;
     } catch (err) {        
         throw err;
     } finally {
         poolStats[nomeBanco].active--;
-        if (db) db.detach();
+        if (db) db.detach(); // garante que sempre fecha
     }
 }
 
