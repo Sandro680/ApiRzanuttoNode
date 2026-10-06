@@ -45,9 +45,11 @@ async function ExecQueryAsync(dbOptions, sql, params = [], commit = "T") {
         db.detach();
 
         return result;
-    } catch (err) {
-        poolStats[nomeBanco].active--;
+    } catch (err) {        
         throw err;
+    } finally {
+        poolStats[nomeBanco].active--;
+        if (db) db.detach();
     }
 }
 

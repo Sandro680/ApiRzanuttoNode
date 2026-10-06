@@ -17,8 +17,14 @@ rotaMarcas.get('/marcas', asyncHandler(async (req, res) => {
         filtro.push(req.query.descricao);
     }
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, filtro, "R");
-    res.json(result);
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, filtro, "R");
+        res.json(result);
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }                    
 }));
 
 
@@ -36,21 +42,32 @@ rotaMarcas.put('/marcas/:mar_codigo', asyncHandler(async (req, res) => {
     const { mar_codigo } = req.params;
     const sql = `update produto_marca set mar_descricao = ? where mar_codigo = ?`;                     
     
-    await ExecQueryAsync(req.dbOptions, sql, [req.params.mar_descricao, mar_codigo], "T");
-    res.status(200).json({ message: `Marca ${mar_codigo} atualizada com sucesso!` });
+    try {
+        await ExecQueryAsync(req.dbOptions, sql, [req.params.mar_descricao, mar_codigo], "T");
+        res.status(200).json({ message: `Marca ${mar_codigo} atualizada com sucesso!` });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }                    
 }));
 
             //DELETE
 rotaMarcas.delete('/marcas/:mar_codigo', asyncHandler(async (req, res) => {
     const { mar_codigo } = req.params;
     const sql = `delete from produto_marca where mar_codigo = ?`;
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, [mar_codigo], "T");
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, [mar_codigo], "T");
-
-    if (result.length === 0) 
-        return res.status(404).json({ erro: "Marca não encontrada" });
-    
-    res.status(200).json({ message: `Marca (código ${mar_codigo}) deletada com sucesso!` });
+        if (result.length === 0) 
+            return res.status(404).json({ erro: "Marca não encontrada" });
+        
+        res.status(200).json({ message: `Marca (código ${mar_codigo}) deletada com sucesso!` });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }                
 }));    
 
 module.exports = { rotaMarcas }

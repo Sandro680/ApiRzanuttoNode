@@ -26,8 +26,14 @@ rotaCidades.get('/cidades', asyncHandler(async (req, res) => {
 
     sql += ` ORDER BY cd_nome`;
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, filtro, "R");
-    res.json(result);
+    try { 
+        const result = await ExecQueryAsync(req.dbOptions, sql, filtro, "R");
+        res.json(result);
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }    
 }));
 
 // INSERT
@@ -41,13 +47,19 @@ rotaCidades.post('/cidades', asyncHandler(async (req, res) => {
         RETURNING CD_CODIGO
     `;
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, [
-        req.body.cd_nome, 
-        req.body.codigo_ibge, 
-        req.body.cd_uf
-    ], "T");
-
-    res.status(201).json({ cd_codigo: result.CD_CODIGO });
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, [
+            req.body.cd_nome, 
+            req.body.codigo_ibge, 
+            req.body.cd_uf
+        ], "T");
+        
+        res.status(201).json({ cd_codigo: result.CD_CODIGO });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }        
 }));
 
 // UPDATE
@@ -69,8 +81,14 @@ rotaCidades.put('/cidades/:cd_codigo', asyncHandler(async (req, res) => {
         req.body.cd_pais, req.body.cd_atualizacao, req.body.cd_disponibilidade, cd_codigo
     ];
 
-    await ExecQueryAsync(req.dbOptions, sql, params, "T");
-    res.status(200).json({ message: `Cidade ${cd_codigo} atualizada com sucesso!` });
+    try {
+        await ExecQueryAsync(req.dbOptions, sql, params, "T");
+        res.status(200).json({ message: `Cidade ${cd_codigo} atualizada com sucesso!` });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }        
 }));
 
 // DELETE
@@ -82,15 +100,21 @@ rotaCidades.delete('/cidades/:cd_codigo', asyncHandler(async (req, res) => {
         RETURNING CD_CODIGO
     `;
 
-    const result = await ExecQueryAsync(req.dbOptions, [sql], [cd_codigo], "T");
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, [sql], [cd_codigo], "T");
 
-    if (result.length === 0) {
-        return res.status(404).json({ erro: "Cidade não encontrada" });
-    }
+        if (result.length === 0) {
+            return res.status(404).json({ erro: "Cidade não encontrada" });
+        }
 
-    res.status(200).json({ 
-        message: `Cidade (código ${result.CD_CODIGO}) deletada com sucesso!` 
-    });
+        res.status(200).json({ 
+            message: `Cidade (código ${result.CD_CODIGO}) deletada com sucesso!` 
+        });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }            
 }));
 
 module.exports = { rotaCidades }

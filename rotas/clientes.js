@@ -36,8 +36,14 @@ rotaClientes.get('/clientes', asyncHandler(async (req, res) => {
         `;
     }    
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, filtro, "R");
-    res.json(result);
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, filtro, "R");
+        res.json(result);
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }        
 }));
 
 // DETALHE
@@ -64,13 +70,19 @@ rotaClientes.get('/cliente/:cl_codigo', asyncHandler(async (req, res) => {
         WHERE cl.cl_codigo = ?
     `;
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, [cl_codigo], "R");
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, [cl_codigo], "R");
 
-    if (result.length === 0) {
-        return res.status(404).json({ erro: "Cliente não encontrado" });
-    }
+        if (result.length === 0) {
+            return res.status(404).json({ erro: "Cliente não encontrado" });
+        }
 
-    res.json(result);
+        res.json(result);
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }            
 }));
 
 // INSERT
@@ -93,8 +105,14 @@ rotaClientes.post('/cliente', asyncHandler(async (req, res) => {
         req.body.cl_cep, req.body.cl_endereco_bairro, req.body.cl_telefone, req.body.cl_email
     ];
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, params, "T");
-    res.status(201).json({ cl_codigo: result.CL_CODIGO });
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, params, "T");
+        res.status(201).json({ cl_codigo: result.CL_CODIGO });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }            
 }));
 
 // UPDATE
@@ -116,8 +134,14 @@ rotaClientes.put('/cliente/:cl_codigo', asyncHandler(async (req, res) => {
         req.body.cl_email, cl_codigo
     ];
 
-    await ExecQueryAsync(req.dbOptions, sql, params, "T");
-    res.status(200).json({ message: `Cliente ${cl_codigo} atualizado com sucesso!` });
+    try {
+        await ExecQueryAsync(req.dbOptions, sql, params, "T");
+        res.status(200).json({ message: `Cliente ${cl_codigo} atualizado com sucesso!` });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }            
 }));
 
 // DELETE
@@ -125,15 +149,21 @@ rotaClientes.delete('/cliente/:cl_codigo', asyncHandler(async (req, res) => {
     const { cl_codigo } = req.params;
     const sql = `DELETE FROM clientes WHERE cl_codigo = ? RETURNING CL_CODIGO`;
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, [cl_codigo], "T");
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, [cl_codigo], "T");
 
-    if (result.length === 0) {
-        return res.status(404).json({ erro: "Cliente não encontrado" });
-    }
+        if (result.length === 0) {
+            return res.status(404).json({ erro: "Cliente não encontrado" });
+        }
 
-    res.status(200).json({ 
-        message: `Cliente (código ${result.CL_CODIGO}) deletado com sucesso!` 
-    });
+        res.status(200).json({ 
+            message: `Cliente (código ${result.CL_CODIGO}) deletado com sucesso!` 
+        });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }            
 }));
 
 module.exports = { rotaClientes }

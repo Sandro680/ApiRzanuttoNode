@@ -89,16 +89,14 @@ rotaPedidos.get('/pedidos', asyncHandler(async (req, res, next) => {
     if (pesquisa != "") sql += pesquisa;     
 
     sql += " ORDER BY 2 DESC";
+    
     try {
         const result = await ExecQueryAsync(req.dbOptions, sql, filtro, "R");        
         res.json(result);
-    } catch (err) {
-        // adiciona a query e os parâmetros ao erro para teste deixar comentado para produção
-        /*err.sql = sql;
-        err.params = filtro;
-        next(err);*/ // passa para o errorHandler
-
-        res.json(err)
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
     }
 }));
 
@@ -128,8 +126,14 @@ rotaPedidos.get('/pedidoitens/:filial/:pedido', asyncHandler(async (req, res) =>
             WHERE I.PVI_FILIAL = ?
               AND I.PVI_PEDIDO = ?`;
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, [filial, pedido], "R");
-    res.json(result);
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, [filial, pedido], "R");
+        res.json(result);
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }    
 }));
 
 rotaPedidos.get('/pedidovenctos/:filial/:pedido', asyncHandler(async (req, res) => {
@@ -139,8 +143,14 @@ rotaPedidos.get('/pedidovenctos/:filial/:pedido', asyncHandler(async (req, res) 
     WHERE V.PVV_FILIAL = ?
       AND V.PVV_PEDIDO = ?`;
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, [filial, pedido], "R");
-    res.json(result);
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, [filial, pedido], "R");
+        res.json(result);
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }    
 }));
 
 
@@ -300,12 +310,18 @@ rotaPedidos.post('/pedido', asyncHandler(async (req, res) => {
         });
     }
     
-    await ExecTransactionAsync(req.dbOptions, operacoes);
+    try {
+        await ExecTransactionAsync(req.dbOptions, operacoes);
 
-    res.status(201).json({ 
-        status: "Sucesso", 
-        mensagem: "Pedido e itens gravados com sucesso!" 
-    });
+        res.status(201).json({ 
+            status: "Sucesso", 
+            mensagem: "Pedido e itens gravados com sucesso!" 
+        });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }    
 }));
 
 //UPDATE
@@ -460,15 +476,21 @@ rotaPedidos.put('/pedido/:filial/:pedido', asyncHandler(async (req, res) => {
                 ]
             });
         });
-    }
+    }    
 
-    // Executa tudo em uma única transação atômica
-    await ExecTransactionAsync(req.dbOptions, operacoes);
+    try {
+        // Executa tudo em uma única transação atômica
+        await ExecTransactionAsync(req.dbOptions, operacoes);
 
-    res.status(200).json({ 
-        status: "Sucesso", 
-        mensagem: "Pedido atualizado com sucesso!" 
-    });
+        res.status(200).json({ 
+            status: "Sucesso", 
+            mensagem: "Pedido atualizado com sucesso!" 
+        });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }        
 }));
 
 // FATURA COM NOTA E SEM NOTA
@@ -476,6 +498,85 @@ rotaPedidos.post('/pedido/faturar', asyncHandler(async (req, res) => {
     const { pv_filial, pv_codigo, tipo, pv_cfop, pv_transportador, pv_user } = req.body;
 
     if (tipo === 'SEM_NOTA') {
+        const sql = `EXECUTE PROCEDURE SPGERAFATURAMENTOF01(?, ?)`;
+        try {
+            await ExecTransactionAsync(req.dbOptions, [
+                { sql, params: [pv_filial, pv_codigo] }
+            ]);
+            return res.json({ 
+                sucesso: true, 
+                mensagem: "Pedido faturado sem nota com sucesso!" 
+            });
+        } catch (err) {
+            console.error("Erro no faturamento sem nota:", err.message);
+            return res.status(400).json({ 
+                sucesso: false, 
+                mensagem: "Erro ao faturar: " + err.message 
+            });
+        }
+    } else if (tipo === 'NFE') {
+        if (!pv_cfop) {
+            return res.status(400).json({ 
+                sucesso: false, 
+                mensagem: "Selecione um CFOP / Tipo de Nota para faturar com NFe" 
+            });
+        }
+
+        const iTipo = 1; // Tipo de faturamento para NFe
+        const iTransp = pv_transportador || 0;
+        const nIdUsuario = pv_user || 1;
+
+        try {
+            const queries = [
+                // 1. SP_GERAR_FATURAMENTO
+                { sql: `SELECT CODIGO FROM SP_GERAR_FATURAMENTO(?, ?)`, params: [pv_filial, iTipo] },
+
+                // 2. FAT_PEDIDOS (usa o CODIGO retornado da query anterior)
+                { sql: `
+                    UPDATE OR INSERT INTO FAT_PEDIDOS (FP_FILIAL, FP_FATURAMENTO, FP_FLAG, FP_PEDIDO)
+                    VALUES (?, ?, ?, ?)
+                    MATCHING (FP_FILIAL, FP_FATURAMENTO, FP_FLAG, FP_PEDIDO)
+                  `,
+                  params: (resFat) => [pv_filial, resFat[0].CODIGO, iTipo, pv_codigo] },
+
+                // 3. SP_GERAR_ITENS_FATURAMENTO
+                { sql: `EXECUTE PROCEDURE SP_GERAR_ITENS_FATURAMENTO(?, ?)`,
+                  params: (resFat) => [resFat[0].CODIGO, pv_filial] },
+
+                // 4. SP_GERAR_VENCTOS_FATURAMENTO
+                { sql: `EXECUTE PROCEDURE SP_GERAR_VENCTOS_FATURAMENTO(?, ?)`,
+                  params: (resFat) => [resFat[0].CODIGO, pv_filial] },
+
+                // 5. SP_NF_GERAR
+                { sql: `EXECUTE PROCEDURE SP_NF_GERAR(?, ?, ?, ?, ?)`,
+                  params: (resFat) => [resFat[0].CODIGO, pv_cfop, iTransp, pv_filial, nIdUsuario] },
+
+                // 6. SP_FINALIZAR_FATURAMENTO
+                { sql: `EXECUTE PROCEDURE SP_FINALIZAR_FATURAMENTO(?, ?)`,
+                  params: (resFat) => [resFat[0].CODIGO, pv_filial] }
+            ];
+
+            const lastResult = await ExecTransactionAsync(req.dbOptions, queries);
+            const iFaturamento = lastResult[0]?.CODIGO || lastResult[0]?.codigo;
+
+            return res.json({ 
+                sucesso: true, 
+                mensagem: "NFe gerada com sucesso!",
+                faturamento: iFaturamento 
+            });
+        } catch (err) {
+            console.error("Erro no faturamento NFe:", err.message);
+            return res.status(400).json({ 
+                sucesso: false, 
+                mensagem: "Erro ao gerar NFe: " + err.message 
+            });
+        }
+    } else {
+        return res.status(400).json({ mensagem: "Tipo de faturamento não implementado" });
+    }
+
+
+    /*if (tipo === 'SEM_NOTA') {
         const sql = `EXECUTE PROCEDURE SPGERAFATURAMENTOF01(?, ?)`;
         try {
             await ExecQueryAsync(req.dbOptions, sql, [pv_filial, pv_codigo], "T");
@@ -550,12 +651,14 @@ rotaPedidos.post('/pedido/faturar', asyncHandler(async (req, res) => {
         }
     } else {
         return res.status(400).json({ mensagem: "Tipo de faturamento não implementado" });
-    }
+    }*/
 }));
 
 // Rota para buscar os CFOPs / Tipos de Nota Fiscal
 rotaPedidos.get('/pesqcfop', asyncHandler(async (req, res) => {
-    const sql = `SELECT TN_CODIGO, TN_DESCRICAO, TN_CFOP FROM TIPO_NOTA_FISCAL ORDER BY TN_DESCRICAO`;
+    const sql = `SELECT TN_CODIGO, CAST(TN_DESCRICAO AS VARCHAR(40) CHARACTER SET WIN1252) TN_DESCRICAO, 
+    TN_CFOP FROM TIPO_NOTA_FISCAL ORDER BY TN_DESCRICAO`;
+
     try {
         const result = await ExecQueryAsync(req.dbOptions, sql, []);
         res.json(result);
@@ -577,8 +680,14 @@ rotaPedidos.delete('/pedido/item/:pvi_filial/:pvi_pedido/:pvi_codigo', asyncHand
         params: [pvi_filial, pvi_pedido, pvi_codigo]
     }];
 
-    await ExecTransactionAsync(req.dbOptions, operacoes);
-    res.status(200).json({ status: "Sucesso", mensagem: "Item removido e estoque atualizado!" });
+    try {
+        await ExecTransactionAsync(req.dbOptions, operacoes);
+        res.status(200).json({ status: "Sucesso", mensagem: "Pedido Excluido!" });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }            
 }));
 
 module.exports = { rotaPedidos }

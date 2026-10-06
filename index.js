@@ -9,14 +9,15 @@ const Table = require("cli-table3");
 const chalk = require("chalk");
 
 // Importação das rotas
-const { rotaClientes }  = require("./rotas/clientes.js");
-const { rotaCidades }   = require("./rotas/cidades.js");
-const { rotaProdutos }  = require("./rotas/produtos.js"); 
-const { rotaFamilias }  = require("./rotas/familias.js");
-const { rotaMarcas }    = require("./rotas/marcas.js"); 
-const { rotaNCM }       = require("./rotas/ncm.js");  
-const { rotaPedidos }   = require("./rotas/pedidos.js");
-const { rotaPesquisas } = require('./rotas/pesquisas.js');
+const { rotaClientes }   = require("./rotas/clientes.js");
+const { rotaCidades }    = require("./rotas/cidades.js");
+const { rotaProdutos }   = require("./rotas/produtos.js"); 
+const { rotaFamilias }   = require("./rotas/familias.js");
+const { rotaMarcas }     = require("./rotas/marcas.js"); 
+const { rotaNCM }        = require("./rotas/ncm.js");  
+const { rotaPedidos }    = require("./rotas/pedidos.js");
+const { rotaPesquisas }  = require('./rotas/pesquisas.js');
+const { rotaNotaFiscal } = require('./rotas/notafiscal.js')
 
 // Definição do Driver do Firebird conforme o Sistema Operacional
 if (process.platform === "win32") {
@@ -153,6 +154,7 @@ app.use('/', autenticarToken, rotaMarcas);
 app.use('/', autenticarToken, rotaNCM);
 app.use('/', autenticarToken, rotaPedidos);
 app.use('/', autenticarToken, rotaPesquisas);
+app.use('/', autenticarToken, rotaNotaFiscal);
 
 // --------------------------------------------------------------------------
 // 5. ROTAS DE ADMINISTRAÇÃO

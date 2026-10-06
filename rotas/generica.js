@@ -20,8 +20,14 @@ rotaGenerica.get('/tabela', asyncHandler(async (req, res) => {
 
     sql += " ORDER BY nome";
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, filtro, "R");
-    res.json(result);
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, filtro, "R");
+        res.json(result);
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }            
 }));
 
 // INSERT
@@ -30,11 +36,17 @@ rotaGenerica.post('/tabela', asyncHandler(async (req, res) => {
                  VALUES (gen_id(gen_tabela, 1), ?, ?) 
                  RETURNING ID`;
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, [
-        req.body.nome, req.body.descricao
-    ], "T");
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, [
+            req.body.nome, req.body.descricao
+        ], "T");
 
-    res.status(201).json({ id: result.ID });
+        res.status(201).json({ id: result.ID });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }            
 }));
 
 // UPDATE
@@ -44,24 +56,36 @@ rotaGenerica.put('/tabela/:id', asyncHandler(async (req, res) => {
                  SET nome = ?, descricao = ? 
                  WHERE id = ?`;
 
+    try {
         await ExecQueryAsync(req.dbOptions, sql, [
             req.body.nome, req.body.descricao, id
         ], "T");
 
         res.json({ message: `Registro ${id} atualizado com sucesso!` });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }                
 }));
 
 // DELETE
 rotaGenerica.delete('/tabela/:id', asyncHandler(async (req, res) => {
     const { id } = req.params;
     const sql = `DELETE FROM tabela WHERE id = ? RETURNING ID`;
+    
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, [id], "T");
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, [id], "T");
+        if (result.length === 0) 
+            return res.status(404).json({ erro: "Registro não encontrado" });
 
-    if (result.length === 0) 
-        return res.status(404).json({ erro: "Registro não encontrado" });
-
-    res.json({ message: `Registro (ID ${result.ID}) deletado com sucesso!` });
+        res.json({ message: `Registro (ID ${result.ID}) deletado com sucesso!` });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }                    
 }));
 
 module.exports = { rotaGenerica }

@@ -48,8 +48,14 @@ rotaProdutos.get('/produtos', asyncHandler(async (req, res) => {
         filtro.push(req.query.pd_preco_vista);
     }    
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, filtro, "R");
-    res.json(result);
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, filtro, "R");
+        res.json(result);
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }        
 }));
 
 // DETALHE
@@ -92,13 +98,19 @@ rotaProdutos.get('/produto/:pd_codigo', asyncHandler(async (req, res) => {
         WHERE pd_codigo = ?
     `;
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, [pd_codigo], "R");
+    try {            
+        const result = await ExecQueryAsync(req.dbOptions, sql, [pd_codigo], "R");
 
-    if (result.length === 0) {
-        return res.status(404).json({ erro: "Produto não encontrado" });
-    }
+        if (result.length === 0) {
+            return res.status(404).json({ erro: "Produto não encontrado" });
+        }
 
-    res.json(result);
+        res.json(result);
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }        
 }));
 
 // INSERT
@@ -126,8 +138,14 @@ rotaProdutos.post('/produto', asyncHandler(async (req, res) => {
         req.body.pd_localizacao, req.body.pd_controlaestoque
     ];
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, params, "T");
-    res.status(201).json({ pd_codigo: result.PD_CODIGO });
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, params, "T");
+        res.status(201).json({ pd_codigo: result.PD_CODIGO });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }        
 }));
 
 // UPDATE
@@ -154,8 +172,14 @@ rotaProdutos.put('/produto/:pd_codigo', asyncHandler(async (req, res) => {
         req.body.pd_controlaestoque, pd_codigo
     ];
 
-    await ExecQueryAsync(req.dbOptions, sql, params, "T");
-    res.status(200).json({ message: `Produto ${pd_codigo} atualizado com sucesso!` });
+    try {
+        await ExecQueryAsync(req.dbOptions, sql, params, "T");
+        res.status(200).json({ message: `Produto ${pd_codigo} atualizado com sucesso!` });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }        
 }));
 
 // DELETE
@@ -163,15 +187,21 @@ rotaProdutos.delete('/produto/:pd_codigo', asyncHandler(async (req, res) => {
     const { pd_codigo } = req.params;
     const sql = `DELETE FROM produtos WHERE pd_codigo = ? RETURNING PD_CODIGO`;
 
-    const result = await ExecQueryAsync(req.dbOptions, sql, [pd_codigo], "T");
+    try {
+        const result = await ExecQueryAsync(req.dbOptions, sql, [pd_codigo], "T");
 
-    if (result.length === 0) {
-        return res.status(404).json({ erro: "Produto não encontrado" });
-    }
+        if (result.length === 0) {
+            return res.status(404).json({ erro: "Produto não encontrado" });
+        }
 
-    res.status(200).json({ 
-        message: `Produto (código ${result.PD_CODIGO}) deletado com sucesso!` 
-    });
+        res.status(200).json({ 
+            message: `Produto (código ${result.PD_CODIGO}) deletado com sucesso!` 
+        });
+    } catch (err) {        
+        //err.sql = sql;
+        //err.params = filtro;
+        next(err); // passa para o errorHandler
+    }        
 }));
 
 module.exports = { rotaProdutos }
